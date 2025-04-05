@@ -10,9 +10,19 @@ from langgraph.prebuilt import ToolNode
 from collections.abc import Iterable
 from random import randint
 from langchain_core.messages.tool import ToolMessage
+from database import (
+    create_connection,
+    fetch_all_menu_items,
+    fetch_operating_hours_by_day,
+)
+import datetime
+from designer import MenuDesigner  # Import the class
 
-
+# ... other imports you might have ...
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+# Initialize the MenuDesigner
+menu_designer = MenuDesigner(GEMINI_API_KEY)
 
 
 class OrderState(TypedDict):
@@ -57,63 +67,83 @@ WAITERBOT_SYSINT = (
     "they have not implemented them yet and should keep reading to do so.",
 )
 
-# This is the message with which the system opens the conversation.
-WELCOME_MSG = "Welcome to Scar's Bakery. Type `Bye` to quit. How may I serve you today?"
+image_path = menu_designer.generate_menu_image()
+
+if image_path:
+    WELCOME_MSG = f"Welcome to Scar's Bakery.\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
+else:
+    WELCOME_MSG = (
+        "Welcome to Scar's Bakery. Type `Bye` to quit. How may I serve you today?"
+    )
 
 
 @tool
 def get_menu() -> str:
-    """Provide the latest up-to-date bakery menu."""
-    return """
-    MENU:
+    """Provide the latest up-to-date bakery menu image and text."""
+    now = datetime.datetime.now()
+    # This will give you the full day name (e.g., "Monday")
+    day_of_week = now.strftime("%A")
+    conn = create_connection()
 
-    Fresh Breads:
-    Sourdough Loaf
-    Whole Wheat Bread
-    Baguette
-    Rye Bread
-    Multigrain Bread
+    if conn:
+        opening_time, closing_time = fetch_operating_hours_by_day(conn, day_of_week)
+        menu_items_from_db = fetch_all_menu_items(conn)
+    else:
+        opening_time, closing_time = None, None
 
-    Pastries:
-    Croissant
-    Pain au Chocolat
-    Almond Croissant
-    Scone (Blueberry, Cranberry)
-    Muffin (Chocolate Chip, Banana Nut)
-    Danish (Apple, Cherry)
+    operating_hours_message = ""
+    if opening_time and closing_time:
+        if opening_time == "Closed" and closing_time == "Closed":
+            operating_hours_message = (
+                f"📢 Today is {day_of_week}, and we are currently closed. 😴"
+            )
+        else:
+            operating_hours_message = f"📢 Welcome to Scar's Bakery! Today's hours ({day_of_week}): {opening_time} - {closing_time}."
+    else:
+        operating_hours_message = f"📢 Welcome to Scar's Bakery! Today's hours for {day_of_week} are not currently available."
 
-    Cakes (Whole & Slice):
-    Chocolate Cake
-    Vanilla Cake
-    Red Velvet Cake
-    Lemon Pound Cake
-    Carrot Cake
+    menu = {}
+    if menu_items_from_db:
+        for item in menu_items_from_db:
+            product_name, price, description = item
+            menu[product_name] = {"price": price, "description": description}
 
-    Cookies:
-    Chocolate Chip Cookie
-    Oatmeal Raisin Cookie
-    Peanut Butter Cookie
-    Sugar Cookie
-    Macaron (Vanilla, Chocolate, Raspberry)
+    operating_hours_info = {}
+    if opening_time and closing_time:
+        operating_hours_info["opening_time"] = opening_time
+        operating_hours_info["closing_time"] = closing_time
+        operating_hours_info["status"] = (
+            "Closed" if opening_time == "Closed" else "Open"
+        )
+    else:
+        operating_hours_info["status"] = "Hours not available"
 
-    Drinks:
-    Coffee (Hot, Iced)
-    Tea (Hot, Iced)
-    Juice (Orange, Apple)
-    Milk
+    if conn:
+        conn.close()
 
-    Add-ons & Modifiers:
-    Cake Size (Whole, Slice)
-    Frosting (Chocolate, Vanilla, Cream Cheese - for cakes)
-    Toppings (Sprinkles, Chocolate Shavings, Fresh Berries - for cakes & pastries)
-    Fillings (Cream, Jam - for pastries)
-    Sweetness Level (Less Sweet, Regular, Extra Sweet - for some items)
-    Special requests: Any reasonable modification that does not involve items not on the menu, for example: 'extra frosting', 'lightly toasted', etc.
+        menu_data = {
+            "operating_hours": operating_hours_info,
+            "menu": menu,
+            "operating_hours_text": operating_hours_message,
+        }
 
-    Notes:
-    "Regular coffee" is our standard blend.
-    Please ask about today's special breads and pastries!
-    """
+    return menu_data
+
+
+# @tool
+# def get_menu_image():
+#     """Generate and provide the latest up-to-date bakery menu image."""
+#     menu_data = get_menu()  # Get the menu data
+#     operating_hours_text = menu_data.get("operating_hours_text", "")
+#     menu_items = menu_data.get("menu", {})
+
+#     # Call the image generation function from our MenuDesigner class
+#     image_path = menu_designer.generate_menu_image(menu_items, operating_hours_text)
+
+#     if image_path:
+#         return f"Here's the menu image: {image_path}"  # For now, just return the path
+#     else:
+#         return "Sorry, I couldn't generate the menu image right now."
 
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
@@ -136,9 +166,9 @@ def chatbot_with_tools(state: OrderState) -> OrderState:
 def human_node(state: OrderState) -> OrderState:
     """Display the last model message to the user, and receive the user's input."""
     last_msg = state["messages"][-1]
-    print("Model:", last_msg.content)
+    print("Waiter:", last_msg.content)
 
-    user_input = input("User: ")
+    user_input = input("Customer: ")
 
     # If it looks like the user is trying to quit, flag the conversation
     # as over.
@@ -177,8 +207,8 @@ def order_node(state: OrderState) -> OrderState:
             if not order:
                 print("  (no items)")
 
-            for drink in order:
-                print(f"  {drink}")
+            for item in order:
+                print(f"  {item}")
 
             response = input("Is this correct? ")
 

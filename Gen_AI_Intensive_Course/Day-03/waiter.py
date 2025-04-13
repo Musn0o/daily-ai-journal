@@ -16,13 +16,15 @@ from database import (
     fetch_operating_hours_by_day,
 )
 import datetime
-from designer import MenuDesigner  # Import the class
+from designer import Designer
+from calendar_helper import Calender
 
-# ... other imports you might have ...
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 # Initialize the MenuDesigner
-menu_designer = MenuDesigner(GEMINI_API_KEY)
+menu_designer = Designer(GEMINI_API_KEY)
+event_organizer = Calender(GEMINI_API_KEY)
+now = datetime.datetime.now()
 
 
 class OrderState(TypedDict):
@@ -44,43 +46,38 @@ class OrderState(TypedDict):
 # The system instruction defines how the chatbot is expected to behave and includes
 # rules for when to call different functions, as well as rules for the conversation, such
 # as tone and what is permitted for discussion.
+
 WAITERBOT_SYSINT = (
     "system",  # 'system' indicates the message is a system instruction.
-    "You are a WaiterBot, an interactive Bakery ordering system in Scar's Bakery. A human will talk to you about the "
-    "available products you have and you will answer any questions about menu items (and only about "
-    "menu items - no off-topic discussion, but you can chat about the products and their history). "
-    "The customer will place an order for 1 or more items from the menu, which you will structure "
-    "and send to the ordering system after confirming the order with the human. "
-    "\n\n"
-    "Add items to the customer's order with add_to_order, and reset the order with clear_order. "
-    "To see the contents of the order so far, call get_order (this is shown to you, not the user) "
-    "Always confirm_order with the user (double-check) before calling place_order. Calling confirm_order will "
-    "display the order items to the user and returns their response to seeing the list. Their response may contain modifications. "
-    "Always verify and respond with baked goods and modifier names from the MENU before adding them to the order. "
-    "If you are unsure a baked goods or modifier matches those on the MENU, ask a question to clarify or redirect. "
-    "You only have the modifiers listed on the menu. "
-    "Once the customer has finished ordering items, Call confirm_order to ensure it is correct then make "
-    "any necessary updates and then call place_order. Once place_order has returned, thank the user and "
-    "say goodbye!"
-    "\n\n"
-    "If any of the tools are unavailable, you can break the fourth wall and tell the user that "
-    "they have not implemented them yet and should keep reading to do so.",
+    "You are Scar's Buddy, your mission is to be the friendliest and most helpful interactive ordering system at Scar's Bakery! 😊 A human customer will chat with you about our delicious baked goods, and you should answer any questions they have about our menu items (and only about menu items, please! Let's keep the focus on the yummy treats 😋). Feel free to chat about the products, maybe even share a little about their history if you know it! 🍰\n\n"
+    "When the customer wants to order, please use the following tools to help them:\n"
+    "- To add items to their order, use `add_to_order`.\n"
+    "- If they want to start over, use `clear_order`.\n"
+    "- If the customer asks about today's special, a recommendation, or what Scar's best dish is, please use `get_special_dish` to show them a picture! 📸\n"
+    "- To see the current order (this is just for your eyes! 😉), call `get_order`.\n"
+    "- Always double-check the order with the customer by calling `confirm_order`. This will show them the list, and they might want to make changes.\n"
+    "- After confirming, and if everything looks good, call `place_order` to finalize their order. Once that's done, thank the customer warmly and wish them a great day! 👋\n\n"
+    "Please always use the exact names of our baked goods and any modifiers from our MENU when adding items to the order. If you're not sure if something matches, don't hesitate to ask the customer for clarification! We only have the modifiers listed on the menu, so please stick to those.\n\n"
+    "Once the customer is done ordering, remember to `confirm_order` to make sure everything is perfect, make any necessary updates, and then `place_order`. After `place_order` is successful, thank them and say a friendly goodbye!\n\n"
+    "If, for some reason, any of the tools are unavailable, you can politely let the customer know that feature hasn't been implemented yet and they should keep an eye out for it in the future! 😉",
+)
+current_month = now.month
+current_day = now.day
+image_path = menu_designer.generate_menu_image(month=current_month, day=current_day)
+
+occasion_name, welcome_message = event_organizer.get_today_occasion(
+    month=current_month, day=current_day
 )
 
-image_path = menu_designer.generate_menu_image()
-
 if image_path:
-    WELCOME_MSG = f"Welcome to Scar's Bakery.\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
+    WELCOME_MSG = f"{welcome_message}\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
 else:
-    WELCOME_MSG = (
-        "Welcome to Scar's Bakery. Type `Bye` to quit. How may I serve you today?"
-    )
+    WELCOME_MSG = f"{welcome_message} Type `Bye` to quit. How may I serve you today?"
 
 
 @tool
 def get_menu() -> str:
     """Provide the latest up-to-date bakery menu image and text."""
-    now = datetime.datetime.now()
     # This will give you the full day name (e.g., "Monday")
     day_of_week = now.strftime("%A")
     conn = create_connection()
@@ -228,6 +225,15 @@ def order_node(state: OrderState) -> OrderState:
             order_placed = True
             response = randint(1, 5)  # ETA in minutes
 
+        elif tool_call["name"] == "get_special_dish":
+            special_product = "Chocolate Croissant"  # Let's hardcode it for now
+            image_path = menu_designer.generate_special_dish_image(
+                special_product="Chocolate Croissant"
+            )
+            response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
+            print(response_message)
+            response = response_message  # Assign the message to the response variable
+
         else:
             raise NotImplementedError(f"Unknown tool call: {tool_call['name']}")
 
@@ -314,12 +320,24 @@ def place_order() -> int:
     """
 
 
+@tool
+def get_special_dish() -> str:
+    """Use this function if the user asks about the today's special, a recommended dish, or Scar's best dish for the day."""
+
+
 # Auto-tools will be invoked automatically by the ToolNode
 auto_tools = [get_menu]
 tool_node = ToolNode(auto_tools)
 
 # Order-tools will be handled by the order node.
-order_tools = [add_to_order, confirm_order, get_order, clear_order, place_order]
+order_tools = [
+    add_to_order,
+    confirm_order,
+    get_order,
+    clear_order,
+    place_order,
+    get_special_dish,
+]
 
 # The LLM needs to know about all of the tools, so specify everything here.
 llm_with_tools = llm.bind_tools(auto_tools + order_tools)

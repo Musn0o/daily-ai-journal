@@ -13,17 +13,22 @@ from langchain_core.messages.tool import ToolMessage
 from database import (
     create_connection,
     fetch_all_menu_items,
-    fetch_operating_hours_by_day,
 )
 import datetime
 from designer import Designer
 from calendar_helper import Calender
+from database_manager import BakerySupervisor  # Import the class
+
 
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
+DATABASE_NAME = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/data/scar_bakery_ai.db"
+SECRET_KEY = "Scar's Bakery Rules"  # Let's define the secret key here for now
+
 
 # Initialize the MenuDesigner
 menu_designer = Designer(GEMINI_API_KEY)
 event_organizer = Calender(GEMINI_API_KEY)
+supervisor = BakerySupervisor(DATABASE_NAME, GEMINI_API_KEY, SECRET_KEY)
 now = datetime.datetime.now()
 
 
@@ -41,6 +46,9 @@ class OrderState(TypedDict):
 
     # Flag indicating that the order is placed and completed.
     finished: bool
+
+    is_admin_mode: bool
+    in_admin_interaction: bool
 
 
 # The system instruction defines how the chatbot is expected to behave and includes
@@ -63,10 +71,12 @@ WAITERBOT_SYSINT = (
 )
 current_month = now.month
 current_day = now.day
-image_path = menu_designer.generate_menu_image(month=current_month, day=current_day)
 
 occasion_name, welcome_message = event_organizer.get_today_occasion(
     month=current_month, day=current_day
+)
+image_path = menu_designer.generate_menu_image(
+    month=current_day, occasion_name=occasion_name
 )
 
 if image_path:
@@ -76,71 +86,17 @@ else:
 
 
 @tool
-def get_menu() -> str:
-    """Provide the latest up-to-date bakery menu image and text."""
-    # This will give you the full day name (e.g., "Monday")
-    day_of_week = now.strftime("%A")
+def get_menu() -> dict:
+    """Provide the latest up-to-date bakery menu."""
     conn = create_connection()
-
-    if conn:
-        opening_time, closing_time = fetch_operating_hours_by_day(conn, day_of_week)
-        menu_items_from_db = fetch_all_menu_items(conn)
-    else:
-        opening_time, closing_time = None, None
-
-    operating_hours_message = ""
-    if opening_time and closing_time:
-        if opening_time == "Closed" and closing_time == "Closed":
-            operating_hours_message = (
-                f"📢 Today is {day_of_week}, and we are currently closed. 😴"
-            )
-        else:
-            operating_hours_message = f"📢 Welcome to Scar's Bakery! Today's hours ({day_of_week}): {opening_time} - {closing_time}."
-    else:
-        operating_hours_message = f"📢 Welcome to Scar's Bakery! Today's hours for {day_of_week} are not currently available."
-
     menu = {}
-    if menu_items_from_db:
+    if conn:
+        menu_items_from_db = fetch_all_menu_items(conn)
         for item in menu_items_from_db:
             product_name, price, description = item
             menu[product_name] = {"price": price, "description": description}
-
-    operating_hours_info = {}
-    if opening_time and closing_time:
-        operating_hours_info["opening_time"] = opening_time
-        operating_hours_info["closing_time"] = closing_time
-        operating_hours_info["status"] = (
-            "Closed" if opening_time == "Closed" else "Open"
-        )
-    else:
-        operating_hours_info["status"] = "Hours not available"
-
-    if conn:
         conn.close()
-
-        menu_data = {
-            "operating_hours": operating_hours_info,
-            "menu": menu,
-            "operating_hours_text": operating_hours_message,
-        }
-
-    return menu_data
-
-
-# @tool
-# def get_menu_image():
-#     """Generate and provide the latest up-to-date bakery menu image."""
-#     menu_data = get_menu()  # Get the menu data
-#     operating_hours_text = menu_data.get("operating_hours_text", "")
-#     menu_items = menu_data.get("menu", {})
-
-#     # Call the image generation function from our MenuDesigner class
-#     image_path = menu_designer.generate_menu_image(menu_items, operating_hours_text)
-
-#     if image_path:
-#         return f"Here's the menu image: {image_path}"  # For now, just return the path
-#     else:
-#         return "Sorry, I couldn't generate the menu image right now."
+    return {"menu": menu}
 
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
@@ -148,8 +104,12 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
 def chatbot_with_tools(state: OrderState) -> OrderState:
     """The chatbot with tools. A simple wrapper around the model's own chat interface."""
-    defaults = {"order": [], "finished": False}
-
+    defaults = {
+        "order": [],
+        "finished": False,
+        "is_admin_mode": False,
+        "in_admin_interaction": False,
+    }
     if state["messages"]:
         new_output = llm_with_tools.invoke([WAITERBOT_SYSINT] + state["messages"])
     else:
@@ -167,12 +127,28 @@ def human_node(state: OrderState) -> OrderState:
 
     user_input = input("Customer: ")
 
-    # If it looks like the user is trying to quit, flag the conversation
-    # as over.
-    if user_input in {"bye", "Bye", "quit", "exit", "goodbye"}:
-        state["finished"] = True
+    if user_input == "!bakery_admin":
+        print("Admin mode activation initiated.")
+        return state | {
+            "is_admin_mode": True,
+            "in_admin_interaction": True,
+            "messages": state["messages"] + [("user", user_input)],
+        }
+    elif user_input in {"bye", "Bye", "quit", "exit", "goodbye"}:
+        return state | {
+            "finished": True,
+            "messages": state["messages"] + [("user", user_input)],
+        }
+    else:
+        return state | {"messages": [("user", user_input)]}
 
-    return state | {"messages": [("user", user_input)]}
+
+def route_after_human_node(state: OrderState) -> dict:
+    """Routes to chatbot or end based on the finished flag."""
+    if state.get("finished", False):
+        return {"next": END}
+    else:
+        return {"next": "chatbot"}
 
 
 def order_node(state: OrderState) -> OrderState:
@@ -283,6 +259,40 @@ def maybe_exit_human_node(state: OrderState) -> Literal["chatbot", "__end__"]:
         return "chatbot"
 
 
+def check_opening_hours_node(state: OrderState):
+    """Checks if the bakery is open and returns a routing decision in a dictionary."""
+    if supervisor.is_bakery_open():
+        print("Supervisor check: Bakery is open!")
+        return {"next": "open"}
+    else:
+        print("Supervisor check: Bakery is closed.")
+        return {"next": "closed"}
+
+
+def say_closed_node(state: OrderState):
+    """Informs the customer that the bakery is closed."""
+    return {
+        "messages": [
+            AIMessage(
+                content="I'm very sorry, but Scar's Bakery is closed for today. Please come back another time!"
+            )
+        ]
+    }
+
+
+def initiate_admin_mode_node(state: OrderState) -> OrderState:
+    """Initiates the admin mode by interacting with the BakerySupervisor."""
+    supervisor = BakerySupervisor()
+    supervisor.start_admin_mode()
+    print("Admin mode initiated in BakerySupervisor.")  # For our debugging
+    return state
+
+
+def supervisor_interaction_node(state: OrderState) -> OrderState:
+    print("Now in supervisor interaction phase (from waiter.py).")
+    return state
+
+
 @tool
 def add_to_order(item: str, modifiers: Iterable[str]) -> str:
     """Adds the specified baked goods to the customer's order, including any modifiers.
@@ -346,21 +356,58 @@ llm_with_tools = llm.bind_tools(auto_tools + order_tools)
 graph_builder = StateGraph(OrderState)
 
 # Nodes
+graph_builder.add_node("check_opening_hours", check_opening_hours_node)
 graph_builder.add_node("chatbot", chatbot_with_tools)
 graph_builder.add_node("human", human_node)
 graph_builder.add_node("tools", tool_node)
 graph_builder.add_node("ordering", order_node)
+graph_builder.add_node("end_closed", say_closed_node)
+graph_builder.add_node("initiate_admin_mode", initiate_admin_mode_node)
+graph_builder.add_node("route_after_human", route_after_human_node)
+graph_builder.add_node(
+    "supervisor_interaction", supervisor_interaction_node
+)  # New node
 
-# Chatbot -> {ordering, tools, human, END}
+# Edges
+graph_builder.add_conditional_edges(
+    "check_opening_hours",
+    lambda state: state.get("next"),
+    {
+        "open": "chatbot",
+        "closed": "end_closed",
+    },
+)
+# Prioritize admin mode routing
+graph_builder.add_conditional_edges(
+    "human",
+    lambda state: "initiate_admin"
+    if state.get("is_admin_mode", False)
+    else "regular_flow",
+    {
+        "regular_flow": "route_after_human",
+        "initiate_admin": "initiate_admin_mode",
+    },
+)
+graph_builder.add_conditional_edges(
+    "route_after_human",
+    lambda state: state.get("next"),
+    {
+        "chatbot": "chatbot",
+        END: END,
+    },
+)
 graph_builder.add_conditional_edges("chatbot", maybe_route_to_tools)
-# Human -> {chatbot, END}
-graph_builder.add_conditional_edges("human", maybe_exit_human_node)
-
-# Tools (both kinds) always route back to chat afterwards.
 graph_builder.add_edge("tools", "chatbot")
 graph_builder.add_edge("ordering", "chatbot")
+graph_builder.add_edge("end_closed", END)
+graph_builder.add_edge(
+    "initiate_admin_mode", "supervisor_interaction"
+)  # Transition to supervisor phase
+graph_builder.add_edge(
+    "supervisor_interaction", "human"
+)  # Get owner's input for supervisor
+graph_builder.add_edge(START, "check_opening_hours")
 
-graph_builder.add_edge(START, "chatbot")
 graph_with_order_tools = graph_builder.compile()
 
 config = {"recursion_limit": 100}

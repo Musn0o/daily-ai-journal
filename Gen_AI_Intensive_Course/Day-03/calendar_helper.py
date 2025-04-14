@@ -7,17 +7,6 @@ class Calender:
         self.client = genai.Client(api_key=api_key)
 
     def get_today_occasion(self, month, day):
-        """
-        Identifies if the given date is a special international day and generates a welcome message.
-
-        Args:
-            month (int): The current month (1-12).
-            day (int): The current day of the month (1-31).
-
-        Returns:
-            tuple: A tuple containing the occasion name (or None if no special occasion)
-                and the welcome message.
-        """
         date_str = f"{month}/{day}"
         prompt = f"""
         Today's date is {date_str}. Please identify if this date corresponds to any significant international special days or observances.
@@ -35,13 +24,17 @@ class Calender:
                 contents=prompt,  # Use the dynamic prompt here
             ),
         )
-        # print(f"Gemini-2.0-flash response: {response[0].text}")
         try:
             result = response[0].text.strip().split("|||")
             if len(result) == 2:
                 occasion_name = result[0].strip()
                 welcome_message = result[1].strip()
                 if occasion_name.lower() == "none":
+                    if month == 6:  # Explicitly check for Pride Month
+                        return (
+                            "Pride Month",
+                            "Celebrate Pride Month with colorful treats from Scar's Bakery!",
+                        )
                     return None, welcome_message
                 else:
                     return occasion_name, welcome_message

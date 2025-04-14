@@ -9,40 +9,30 @@ class Designer:
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
 
-    def generate_menu_image(self, month, day):
-        special_dates = [
-            (12, 25),  # Christmas
-            (2, 14),  # Valentine's Day
-            (10, 31),  # Halloween
-            # Add more special dates as you like!
-        ]
-
-        if (month, day) in special_dates:
-            if month == 12:
+    def generate_menu_image(self, month, occasion_name):
+        if occasion_name:
+            prompt = f"""Generate an image with title "Welcome to Scar's Bakery" and {occasion_name}-theme"""
+        else:
+            if month in (1, 2, 12, 11):  # Winter (including November as early winter)
                 prompt = """
-                Generate a festive Christmas-themed image for Scar's Bakery
+                Generate a cozy winter-themed image with title "Welcome to Scar's Bakery"
                 """
-            elif month == 2:
+            elif month in (3, 4, 5):  # Spring
                 prompt = """
-                Generate a romantic and inviting image for Scar's Bakery with a Valentine's Day theme. Include the bakery name "Scar's Bakery" in a lovely font. Feature a delightful display of heart-shaped baked goods such as cookies, cupcakes, and perhaps a small cake decorated with hearts or roses. Incorporate Valentine's Day elements like hearts, roses, ribbons, and soft, romantic colors (reds, pinks, whites). The bakery name should be clearly visible and the focus should be on the baked goods and the Valentine's Day atmosphere.
+                Generate a cheerful spring-themed image with title "Welcome to Scar's Bakery"
                 """
-            elif month == 10:
+            elif month in (6, 7, 8):  # Summer
                 prompt = """
-                Generate a spooky Halloween-themed image for Scar's Bakery
+                Generate a bright and cheerful summer-themed image with title "Welcome to Scar's Bakery"
                 """
-            # Add more conditions for other special dates
-        elif month == 6:  # June - Summer month theme
-            prompt = """
-            Generate a bright and cheerful summer-themed image for Scar's Bakery...
-            """
-        elif month == 4:  # April - Spring month theme
-            prompt = """
-            Generate a cheerful spring-themed image for Scar's Bakery...
-            """
-        else:  # Default theme
-            prompt = """
-            Generate a general bakery-themed image for Scar's Bakery...
-            """
+            elif month in (9, 10):  # Autumn/Fall
+                prompt = """
+                Generate a warm autumn-themed image with title "Welcome to Scar's Bakery"
+                """
+            else:  # Default (shouldn't ideally be reached with valid month)
+                prompt = """
+                Generate a general bakery-themed image with title "Welcome to Scar's Bakery"
+                """
 
         response = self.client.models.generate_content(
             model="gemini-2.0-flash-exp-image-generation",
@@ -56,7 +46,7 @@ class Designer:
         for part in response.candidates[0].content.parts:
             if part.inline_data is not None:
                 image = Image.open(BytesIO((part.inline_data.data)))
-                image_file_path = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/media/scar_bakery_menu.png"  # Let's save it as a PNG
+                image_file_path = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/media/scar_bakery_welcome.png"  # Let's save it as a PNG
                 image.save(image_file_path)
                 print(f"Menu image saved to: {image_file_path}")
 

@@ -10,26 +10,21 @@ from langgraph.prebuilt import ToolNode
 from collections.abc import Iterable
 from random import randint
 from langchain_core.messages.tool import ToolMessage
-from database import (
+from database_utils import (
     create_connection,
     fetch_all_menu_items,
 )
-import datetime
+from bakery_beat import BakeryBeat
+from database_manager import BakerySupervisor
 from designer import Designer
-from calendar_helper import Calender
-from database_manager import BakerySupervisor  # Import the class
-
+from prompts import WAITERBOT_SYSINT
 
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
-DATABASE_NAME = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/data/scar_bakery_ai.db"
-SECRET_KEY = "Scar's Bakery Rules"  # Let's define the secret key here for now
-
 
 # Initialize the MenuDesigner
-menu_designer = Designer(GEMINI_API_KEY)
-event_organizer = Calender(GEMINI_API_KEY)
-supervisor = BakerySupervisor(DATABASE_NAME, GEMINI_API_KEY, SECRET_KEY)
-now = datetime.datetime.now()
+chronos_companion = BakeryBeat()
+supervisor = BakerySupervisor()
+bakery_designer = Designer()
 
 
 class OrderState(TypedDict):
@@ -51,43 +46,10 @@ class OrderState(TypedDict):
     in_admin_interaction: bool
 
 
-# The system instruction defines how the chatbot is expected to behave and includes
-# rules for when to call different functions, as well as rules for the conversation, such
-# as tone and what is permitted for discussion.
-
-WAITERBOT_SYSINT = (
-    "system",  # 'system' indicates the message is a system instruction.
-    "You are Scar's Buddy, your mission is to be the friendliest and most helpful interactive ordering system at Scar's Bakery! 😊 A human customer will chat with you about our delicious baked goods, and you should answer any questions they have about our menu items (and only about menu items, please! Let's keep the focus on the yummy treats 😋). Feel free to chat about the products, maybe even share a little about their history if you know it! 🍰\n\n"
-    "When the customer wants to order, please use the following tools to help them:\n"
-    "- To add items to their order, use `add_to_order`.\n"
-    "- If they want to start over, use `clear_order`.\n"
-    "- If the customer asks about today's special, a recommendation, or what Scar's best dish is, please use `get_special_dish` to show them a picture! 📸\n"
-    "- To see the current order (this is just for your eyes! 😉), call `get_order`.\n"
-    "- Always double-check the order with the customer by calling `confirm_order`. This will show them the list, and they might want to make changes.\n"
-    "- After confirming, and if everything looks good, call `place_order` to finalize their order. Once that's done, thank the customer warmly and wish them a great day! 👋\n\n"
-    "Please always use the exact names of our baked goods and any modifiers from our MENU when adding items to the order. If you're not sure if something matches, don't hesitate to ask the customer for clarification! We only have the modifiers listed on the menu, so please stick to those.\n\n"
-    "Once the customer is done ordering, remember to `confirm_order` to make sure everything is perfect, make any necessary updates, and then `place_order`. After `place_order` is successful, thank them and say a friendly goodbye!\n\n"
-    "If, for some reason, any of the tools are unavailable, you can politely let the customer know that feature hasn't been implemented yet and they should keep an eye out for it in the future! 😉",
-)
-current_month = now.month
-current_day = now.day
-
-occasion_name, welcome_message = event_organizer.get_today_occasion(
-    month=current_month, day=current_day
-)
-image_path = menu_designer.generate_menu_image(
-    month=current_day, occasion_name=occasion_name
-)
-
-if image_path:
-    WELCOME_MSG = f"{welcome_message}\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
-else:
-    WELCOME_MSG = f"{welcome_message} Type `Bye` to quit. How may I serve you today?"
-
-
 @tool
 def get_menu() -> dict:
     """Provide the latest up-to-date bakery menu."""
+    # TODO: Refactor to get menu from supervisor.supervisor.get_menu()
     conn = create_connection()
     menu = {}
     if conn:
@@ -108,12 +70,12 @@ def chatbot_with_tools(state: OrderState) -> OrderState:
         "order": [],
         "finished": False,
         "is_admin_mode": False,
-        "in_admin_interaction": False,
+        "admin_initiated": False,
     }
     if state["messages"]:
         new_output = llm_with_tools.invoke([WAITERBOT_SYSINT] + state["messages"])
     else:
-        new_output = AIMessage(content=WELCOME_MSG)
+        new_output = AIMessage(content=chronos_companion.generate_welcome_message())
 
     # Set up some defaults if not already set, then pass through the provided state,
     # overriding only the "messages" field.
@@ -127,11 +89,15 @@ def human_node(state: OrderState) -> OrderState:
 
     user_input = input("Customer: ")
 
-    if user_input == "!bakery_admin":
+    if user_input == "!Scar_in":
         print("Admin mode activation initiated.")
+        supervisor = BakerySupervisor()
+        supervisor.start_admin_mode()
+        print("Admin mode initiated in BakerySupervisor.")
         return state | {
             "is_admin_mode": True,
-            "in_admin_interaction": True,
+            "admin_initiated": True,
+            "finished": True,
             "messages": state["messages"] + [("user", user_input)],
         }
     elif user_input in {"bye", "Bye", "quit", "exit", "goodbye"}:
@@ -203,7 +169,7 @@ def order_node(state: OrderState) -> OrderState:
 
         elif tool_call["name"] == "get_special_dish":
             special_product = "Chocolate Croissant"  # Let's hardcode it for now
-            image_path = menu_designer.generate_special_dish_image(
+            image_path = bakery_designer.generate_special_dish_image(
                 special_product="Chocolate Croissant"
             )
             response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
@@ -261,11 +227,12 @@ def maybe_exit_human_node(state: OrderState) -> Literal["chatbot", "__end__"]:
 
 def check_opening_hours_node(state: OrderState):
     """Checks if the bakery is open and returns a routing decision in a dictionary."""
-    if supervisor.is_bakery_open():
-        print("Supervisor check: Bakery is open!")
+    if chronos_companion.is_bakery_open():
         return {"next": "open"}
     else:
-        print("Supervisor check: Bakery is closed.")
+        print(
+            "Schedule Buddy: Aww, so sorry! 😔 Scar's Bakery is currently closed for the day. We'll be back bright and early to bake you more delicious treats! 🥐 See you soon!"
+        )
         return {"next": "closed"}
 
 
@@ -281,11 +248,11 @@ def say_closed_node(state: OrderState):
 
 
 def initiate_admin_mode_node(state: OrderState) -> OrderState:
-    """Initiates the admin mode by interacting with the BakerySupervisor."""
+    """Initiates the admin mode by interacting with the BakerySupervisor and sets the finished flag."""
     supervisor = BakerySupervisor()
     supervisor.start_admin_mode()
-    print("Admin mode initiated in BakerySupervisor.")  # For our debugging
-    return state
+    print("Admin mode initiated in BakerySupervisor.")
+    return state | {"finished": True}
 
 
 def supervisor_interaction_node(state: OrderState) -> OrderState:
@@ -362,11 +329,7 @@ graph_builder.add_node("human", human_node)
 graph_builder.add_node("tools", tool_node)
 graph_builder.add_node("ordering", order_node)
 graph_builder.add_node("end_closed", say_closed_node)
-graph_builder.add_node("initiate_admin_mode", initiate_admin_mode_node)
 graph_builder.add_node("route_after_human", route_after_human_node)
-graph_builder.add_node(
-    "supervisor_interaction", supervisor_interaction_node
-)  # New node
 
 # Edges
 graph_builder.add_conditional_edges(
@@ -377,15 +340,14 @@ graph_builder.add_conditional_edges(
         "closed": "end_closed",
     },
 )
-# Prioritize admin mode routing
 graph_builder.add_conditional_edges(
     "human",
-    lambda state: "initiate_admin"
-    if state.get("is_admin_mode", False)
+    lambda state: "end_session"
+    if state.get("admin_initiated", False)
     else "regular_flow",
     {
         "regular_flow": "route_after_human",
-        "initiate_admin": "initiate_admin_mode",
+        "end_session": END,
     },
 )
 graph_builder.add_conditional_edges(
@@ -400,12 +362,6 @@ graph_builder.add_conditional_edges("chatbot", maybe_route_to_tools)
 graph_builder.add_edge("tools", "chatbot")
 graph_builder.add_edge("ordering", "chatbot")
 graph_builder.add_edge("end_closed", END)
-graph_builder.add_edge(
-    "initiate_admin_mode", "supervisor_interaction"
-)  # Transition to supervisor phase
-graph_builder.add_edge(
-    "supervisor_interaction", "human"
-)  # Get owner's input for supervisor
 graph_builder.add_edge(START, "check_opening_hours")
 
 graph_with_order_tools = graph_builder.compile()

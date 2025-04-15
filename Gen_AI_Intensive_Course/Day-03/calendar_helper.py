@@ -1,13 +1,17 @@
 from google import genai
-from google.genai import types
+import datetime
 
 
-class Calender:
+class Calendar:
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
+        self.now = datetime.datetime.now()
 
-    def get_today_occasion(self, month, day):
-        date_str = f"{month}/{day}"
+    def get_today_occasion(self):
+        current_month = self.now.month
+        current_day = self.now.day
+
+        date_str = f"{current_month}/{current_day}"
         prompt = f"""
         Today's date is {date_str}. Please identify if this date corresponds to any significant international special days or observances.
 
@@ -30,7 +34,7 @@ class Calender:
                 occasion_name = result[0].strip()
                 welcome_message = result[1].strip()
                 if occasion_name.lower() == "none":
-                    if month == 6:  # Explicitly check for Pride Month
+                    if current_month == 6:  # Explicitly check for Pride Month
                         return (
                             "Pride Month",
                             "Celebrate Pride Month with colorful treats from Scar's Bakery!",

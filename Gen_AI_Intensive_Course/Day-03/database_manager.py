@@ -1,11 +1,18 @@
+# At the beginning of database_manager.py
 import os
 import sqlite3
 from langchain_google_genai import ChatGoogleGenerativeAI
 import json
 import datetime
-import pytz  # You might need to install this: pip install pytz
+import pytz
 from google import genai
 from google.api_core import retry
+from typing_extensions import TypedDict
+from typing import Annotated, List
+from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langgraph.graph.message import add_messages
+
 
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
 DATABASE_NAME = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/data/scar_bakery_ai.db"
@@ -27,6 +34,11 @@ class BakerySupervisor:
         self.api_key = api_key
         self.secret_key = secret_key
         print("BakerySupervisor initialized.")
+        print(f"API Key in BakerySupervisor: {self.api_key is not None}")
+        self.admin_interface = None  # We'll instantiate this when admin mode starts
+        self.model = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash", google_api_key=self.api_key
+        )  # Initialize model here
 
     def create_connection(self):
         """Creates a connection to the SQLite database."""
@@ -481,53 +493,152 @@ class BakerySupervisor:
                 "Failed to retrieve data entry instructions from the AI. Data entry will not start."
             )
 
-    def is_bakery_open(self):
-        now = datetime.datetime.now(pytz.timezone("EET"))  # Get current time in EET
-        current_day = now.strftime("%A")  # Get full day name (e.g., Monday)
-        current_time = now.strftime("%H:%M")  # Get current time in HH:MM format
-
-        conn = self.create_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT opening_time, closing_time FROM operating_hours WHERE day_of_week=?",
-                (current_day,),
-            )
-            result = cursor.fetchone()
-            conn.close()
-
-            if result:
-                opening_time_str, closing_time_str = result
-                if opening_time_str is None or closing_time_str is None:
-                    return False  # Assume closed if no hours are set or if set to None
-
-                try:
-                    opening_time = datetime.datetime.strptime(
-                        opening_time_str, "%H:%M"
-                    ).time()
-                    closing_time = datetime.datetime.strptime(
-                        closing_time_str, "%H:%M"
-                    ).time()
-                    current_time_obj = datetime.datetime.strptime(
-                        current_time, "%H:%M"
-                    ).time()
-
-                    if opening_time <= current_time_obj <= closing_time:
-                        return True
-                    else:
-                        return False
-                except ValueError:
-                    print(
-                        f"Error parsing time for {current_day}: Opening - {opening_time_str}, Closing - {closing_time_str}"
-                    )
-                    return False
-            else:
-                return False  # Assume closed if no entry for the current day
-
-        return False  # Return False if connection fails
-
     def start_admin_mode(self):
-        print("Hi")
+        print("Hi from BakerySupervisor's start_admin_mode")
+        self.admin_interface = BakeryAdminInterface(
+            self, self.model
+        )  # Pass the supervisor and the model instance
+        self.admin_interface.start_admin_interaction()
+
+
+class AdminState(TypedDict):
+    messages: Annotated[List[BaseMessage], add_messages]
+
+
+class BakeryAdminInterface:
+    def __init__(self, supervisor, model):  # Receive the model instance
+        self.supervisor = supervisor
+        self.api_key = supervisor.api_key
+        self.model = model  # Use the passed model instance
+        self.system_prompt = "Hello, admin."  # Keeping it simple for now
+
+    def initial_greeting_node(self, state: AdminState):
+        response = self.model.invoke([SystemMessage(content=self.system_prompt)])
+        return {"messages": [response]}
+
+    def start_admin_interaction(self):
+        print("Starting simplified admin interaction...")
+        graph_builder = StateGraph(AdminState)
+        graph_builder.add_node("initial_greeting", self.initial_greeting_node)
+        graph_builder.set_entry_point("initial_greeting")
+        graph_builder.add_edge("initial_greeting", END)
+        self.admin_graph = graph_builder.compile()
+        config = {"recursion_limit": 100}
+        final_state = self.admin_graph.invoke({"messages": []}, config)
+        print("Simplified Admin Interaction Finished.")
+        print("Final State:", final_state)
+
+
+# class AdminState(TypedDict):
+#     messages: Annotated[List[BaseMessage], add_messages]
+
+
+# class BakeryAdminInterface:
+#     def __init__(self, supervisor):
+#         self.supervisor = supervisor
+#         self.api_key = supervisor.api_key
+#         self.model = ChatGoogleGenerativeAI(
+#             model="gemini-2.0-flash", google_api_key=self.api_key
+#         )
+#         self.system_prompt = "Hello, admin."  # Simplified prompt
+#         self.graph_builder = StateGraph(AdminState)
+#         self.admin_graph = None  # We'll compile the graph later
+
+#     def initial_greeting_node(self, state: AdminState):
+#         model = ChatGoogleGenerativeAI(
+#             model="gemini-2.0-flash", google_api_key=self.api_key
+#         )
+#         response = model.invoke([SystemMessage(content=self.system_prompt)])
+#         return {"messages": [response]}
+
+#     def human_input_node_admin(self, state: AdminState):
+#         last_msg = state["messages"][-1]
+#         if isinstance(last_msg, AIMessage):
+#             print("Admin Assistant:", last_msg.content)
+#         user_input = input("Owner: ")
+#         return {"messages": [HumanMessage(content=user_input)]}
+
+#     def admin_task_router_node(self, state: AdminState):
+#         """Routes the admin interaction based on the owner's input."""
+#         last_msg = state["messages"][-1]
+#         if isinstance(last_msg, HumanMessage):
+#             user_input = last_msg.content
+#             print(f"Owner's input: {user_input}")
+#             # We'll use the model to understand the intent and decide the next step
+#             # For now, let's just hardcode a response to test the routing
+#             if "menu" in user_input.lower():
+#                 return {"next_task": "update_menu"}
+#             elif "hours" in user_input.lower():
+#                 return {"next_task": "update_hours"}
+#             elif "report" in user_input.lower():
+#                 return {"next_task": "view_reports"}
+#             elif "exit" in user_input.lower():
+#                 return {"next_task": "exit_admin"}
+#             else:
+#                 return {"next_task": "unknown_command"}
+#         else:
+#             # This should ideally not happen here, but let's handle it just in case
+#             return {"next_task": "unknown"}
+
+#     def start_admin_interaction(self):
+#         print("Starting admin interaction...")
+
+#         self.graph_builder.add_node("initial_greeting", self.initial_greeting_node)
+#         self.graph_builder.add_node("owner_input", self.human_input_node_admin)
+#         self.graph_builder.add_node("task_router", self.admin_task_router_node)
+
+#         self.graph_builder.add_edge(START, "initial_greeting")
+#         self.graph_builder.add_edge("initial_greeting", "owner_input")
+#         self.graph_builder.add_edge("owner_input", "task_router")
+
+#         # Add conditional edges from the task router
+#         self.graph_builder.add_conditional_edges(
+#             "task_router",
+#             lambda state: state.get("next_task"),
+#             {
+#                 "update_menu": "handle_update_menu",  # We'll create this node later
+#                 "update_hours": "handle_update_hours",  # We'll create this node later
+#                 "view_reports": "handle_view_reports",  # We'll create this node later
+#                 "exit_admin": END,  # For now, exiting will end the admin session
+#                 "unknown_command": "owner_input",  # If the command is not recognized, go back for more input
+#                 "unknown": "owner_input",  # Handle the 'unknown' case as well
+#             },
+#         )
+
+#         # For now, let's add a simple placeholder node for update_menu
+#         def handle_update_menu_node(state):
+#             print("Handling update menu...")
+#             return {}
+
+#         self.graph_builder.add_node("handle_update_menu", handle_update_menu_node)
+#         self.graph_builder.add_edge(
+#             "handle_update_menu", "owner_input"
+#         )  # Go back for more
+
+#         # Placeholder for update_hours
+#         def handle_update_hours_node(state):
+#             print("Handling update hours...")
+#             return {}
+
+#         self.graph_builder.add_node("handle_update_hours", handle_update_hours_node)
+#         self.graph_builder.add_edge(
+#             "handle_update_hours", "owner_input"
+#         )  # Go back for more
+
+#         # Placeholder for view_reports
+#         def handle_view_reports_node(state):
+#             print("Handling view reports...")
+#             return {}
+
+#         self.graph_builder.add_node("handle_view_reports", handle_view_reports_node)
+#         self.graph_builder.add_edge(
+#             "handle_view_reports", "owner_input"
+#         )  # Go back for more
+
+#         self.admin_graph = self.graph_builder.compile()
+#         config = {"recursion_limit": 100}
+#         final_state = self.admin_graph.invoke({"messages": []}, config)
+#         print("Final Admin State:", final_state)
 
 
 if __name__ == "__main__":

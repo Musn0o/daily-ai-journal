@@ -1,4 +1,5 @@
 # designer.py
+import os
 from google import genai
 from google.genai import types
 from PIL import Image
@@ -6,10 +7,11 @@ from io import BytesIO
 
 
 class Designer:
-    def __init__(self, api_key):
-        self.client = genai.Client(api_key=api_key)
+    def __init__(self):
+        GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
+        self.client = genai.Client(api_key=GEMINI_API_KEY)
 
-    def generate_menu_image(self, month, occasion_name):
+    def generate_welcome_image(self, month, occasion_name):
         if occasion_name:
             prompt = f"""Generate an image with title "Welcome to Scar's Bakery" and {occasion_name}-theme"""
         else:

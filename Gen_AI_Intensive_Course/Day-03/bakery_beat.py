@@ -8,7 +8,9 @@ from calendar_helper import Calendar
 
 
 class BakeryBeat:
-    def __init__(self):
+    def __init__(self, db_connection):
+        self.conn = db_connection
+        self.cursor = self.conn.cursor()
         GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
         self.client = genai.Client(api_key=GEMINI_API_KEY)
         self.menu_designer = Designer()
@@ -26,46 +28,40 @@ class BakeryBeat:
         current_day = now.strftime("%A")  # Get full day name (e.g., Monday)
         current_time = now.strftime("%H:%M")  # Get current time in HH:MM format
 
-        conn = create_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT opening_time, closing_time FROM operating_hours WHERE day_of_week=?",
-                (current_day,),
-            )
-            result = cursor.fetchone()
-            conn.close()
+        self.cursor.execute(
+            "SELECT opening_time, closing_time FROM operating_hours WHERE day_of_week=?",
+            (current_day,),
+        )
+        result = self.cursor.fetchone()
 
-            if result:
-                opening_time_str, closing_time_str = result
-                if opening_time_str is None or closing_time_str is None:
-                    return False  # Assume closed if no hours are set or if set to None
+        if result:
+            opening_time_str, closing_time_str = result
+            if opening_time_str is None or closing_time_str is None:
+                return False  # Assume closed if no hours are set or if set to None
 
-                try:
-                    opening_time = datetime.datetime.strptime(
-                        opening_time_str, "%H:%M"
-                    ).time()
-                    closing_time = datetime.datetime.strptime(
-                        closing_time_str, "%H:%M"
-                    ).time()
-                    # Note: Closing times after midnight should be represented using the hour of the next day (e.g., 01:00 for 1 AM).
-                    current_time_obj = datetime.datetime.strptime(
-                        current_time, "%H:%M"
-                    ).time()
-                    print(opening_time, current_time_obj, closing_time)
-                    if opening_time <= current_time_obj <= closing_time:
-                        return True
-                    else:
-                        return False
-                except ValueError:
-                    print(
-                        f"Error parsing time for {current_day}: Opening - {opening_time_str}, Closing - {closing_time_str}"
-                    )
+            try:
+                opening_time = datetime.datetime.strptime(
+                    opening_time_str, "%H:%M"
+                ).time()
+                closing_time = datetime.datetime.strptime(
+                    closing_time_str, "%H:%M"
+                ).time()
+                # Note: Closing times after midnight should be represented using the hour of the next day (e.g., 01:00 for 1 AM).
+                current_time_obj = datetime.datetime.strptime(
+                    current_time, "%H:%M"
+                ).time()
+                print(opening_time, current_time_obj, closing_time)
+                if opening_time <= current_time_obj <= closing_time:
+                    return True
+                else:
                     return False
-            else:
-                return False  # Assume closed if no entry for the current day
-
-        return False  # Return False if connection fails
+            except ValueError:
+                print(
+                    f"Error parsing time for {current_day}: Opening - {opening_time_str}, Closing - {closing_time_str}"
+                )
+                return False
+        else:
+            return False  # Assume closed if no entry for the current day
 
     def generate_welcome_message(self):
         current_month = self.now.month

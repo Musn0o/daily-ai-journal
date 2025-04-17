@@ -53,12 +53,10 @@ def get_menu_items():
         return "Error: Could not connect to the database."
 
 
-def process_bakery_order(customer_name, customer_email, order_items):
-    """Processes a bakery order: updates stock in the menu table (case-insensitive) by creating its own connection."""
-    DATABASE_NAME = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/data/scar_bakery_ai.db"  # Ensure this is correct
-    conn = None
+def process_bakery_order(order_items):
+    """Processes a bakery order: updates stock in the menu table (case-insensitive) using the provided connection."""
     try:
-        conn = sqlite3.connect(DATABASE_NAME)
+        conn = create_connection()
         cursor = conn.cursor()
 
         for item_name in order_items:
@@ -70,38 +68,98 @@ def process_bakery_order(customer_name, customer_email, order_items):
                 (item_name_lower,),
             )
             result = cursor.fetchone()
-            print(f"Query result for {item_name_lower}: {result}")
 
             if result:
                 current_quantity = result[0]
-                print(f"Current quantity for {item_name}: {current_quantity}")
                 if current_quantity > 0:
                     new_quantity = current_quantity - 1
                     cursor.execute(
                         "UPDATE menu SET quantity = ? WHERE LOWER(product_name) = ?",
-                        (item_name_lower, new_quantity),
+                        (new_quantity, item_name_lower),
                     )
-                    print(f"Updated quantity for {item_name} to: {new_quantity}")
                 else:
                     print(f"Warning: Out of stock for {item_name}")
             else:
                 print(f"Warning: Product '{item_name}' not found in the menu")
 
         conn.commit()
-        print("Database changes committed within process_bakery_order.")
-        conn.close()
-        print("Database connection closed within process_bakery_order.")
         return True
 
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         if conn:
             conn.rollback()
-            conn.close()
         return False
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
+
+
+def add_customer(name: str, contact_info: str):
+    """Adds a new customer to the customers table."""
+    print(f"Adding customer: {name} email: {contact_info}")
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO customers (name, contact_info) VALUES (?, ?)",
+                (name, contact_info),
+            )
+            conn.commit()
+            conn.close()
+            return f"Successfully added customer '{name}' with contact info '{contact_info}'."
+        except sqlite3.Error as e:
+            conn.rollback()
+            conn.close()
+            return f"Database error adding customer '{name}': {e}"
+    else:
+        return "Error: Could not connect to the database."
+
+
+# def process_bakery_order(customer_name, customer_email, order_items):
+#     """Processes a bakery order: updates stock in the menu table."""
+#     try:
+#         conn = create_connection()
+#         cursor = conn.cursor()
+
+#         for item_name in order_items:
+#             cursor.execute(
+#                 "SELECT quantity FROM menu WHERE product_name = ?", (item_name,)
+#             )
+#             result = cursor.fetchone()
+
+#             if result:
+#                 current_quantity = result[0]
+#                 if current_quantity > 0:
+#                     new_quantity = current_quantity - 1
+#                     cursor.execute(
+#                         "UPDATE menu SET quantity = ? WHERE product_name = ?",
+#                         (new_quantity, item_name),
+#                     )
+#                 else:
+#                     print(
+#                         f"Warning: Out of stock for {item_name}"
+#                     )  # Consider logging this or handling it differently
+#             else:
+#                 print(
+#                     f"Warning: Product '{item_name}' not found in the menu"
+#                 )  # Consider logging this
+
+#         conn.commit()
+#         conn.close()
+#         print(f"Stock updated for order by {customer_name}.")
+#         return True
+
+#     except sqlite3.Error as e:
+#         print(f"Database error: {e}")
+#         if conn:
+#             conn.rollback()
+#             conn.close()
+#         return False
+#     except Exception as e:
+#         print(f"An error occurred: {e}")
+#         return False
 
 
 def update_product_quantity_after_order(product_name: str, quantity_change: int):

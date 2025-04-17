@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from typing import Optional
-from database_utils import create_connection, get_menu_items
+from database_utils import create_connection, get_menu_items, add_customer
 from prompts import document_controller_prompt
 from google import genai
 from google.genai import types
@@ -17,7 +17,7 @@ class DocumentController:
             self.update_menu_item,
             self.update_product_quantity_after_order,
             self.update_operating_hours,
-            self.add_customer,
+            add_customer,
             self.update_customer,
             get_menu_items,
             self.get_operating_hours,
@@ -35,43 +35,6 @@ class DocumentController:
                 tools=self.tools,
             ),
         )
-
-    # def get_menu_items(self):
-    #     """Retrieves all items currently in the menu."""
-    #     conn = create_connection()
-    #     if conn:
-    #         cursor = conn.cursor()
-    #         try:
-    #             cursor.execute(
-    #                 "SELECT product_name, price, description, quantity, availability FROM menu"
-    #             )
-    #             results = cursor.fetchall()
-    #             conn.close()
-    #             if results:
-    #                 menu_items = []
-    #                 for row in results:
-    #                     menu_items.append(
-    #                         {
-    #                             "product_name": row[0],
-    #                             "price": row[1],
-    #                             "description": row[2],
-    #                             "quantity": row[3],
-    #                             "availability": row[4],
-    #                         }
-    #                     )
-    #                 return "Current menu items:\n" + "\n".join(
-    #                     [
-    #                         f"- {item['product_name']}: ${item['price']:.2f}, Quantity: {item['quantity']} ({item['availability']})"
-    #                         for item in menu_items
-    #                     ]
-    #                 )
-    #             else:
-    #                 return "The menu is currently empty."
-    #         except sqlite3.Error as e:
-    #             conn.close()
-    #             return f"Database error retrieving menu items: {e}"
-    #     else:
-    #         return "Error: Could not connect to the database."
 
     def add_menu_item(
         self, product_name: str, price: float, description: str, quantity: int
@@ -298,26 +261,6 @@ class DocumentController:
             except sqlite3.Error as e:
                 conn.close()
                 return f"Database error retrieving operating hours: {e}"
-        else:
-            return "Error: Could not connect to the database."
-
-    def add_customer(self, name: str, contact_info: str):
-        """Adds a new customer to the customers table."""
-        conn = create_connection()
-        if conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute(
-                    "INSERT INTO customers (name, contact_info) VALUES (?, ?)",
-                    (name, contact_info),
-                )
-                conn.commit()
-                conn.close()
-                return f"Successfully added customer '{name}' with contact info '{contact_info}'."
-            except sqlite3.Error as e:
-                conn.rollback()
-                conn.close()
-                return f"Database error adding customer '{name}': {e}"
         else:
             return "Error: Could not connect to the database."
 

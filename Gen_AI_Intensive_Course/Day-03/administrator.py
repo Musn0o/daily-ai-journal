@@ -29,7 +29,6 @@ class Administrator:
         self.db_name = db_name
         self.api_key = os.environ.get("GOOGLE_API_KEY")
         print("BakerySupervisor initialized.")
-        self.admin_interface = None  # We'll instantiate this when admin mode starts
 
     def list_tables(self):
         """Retrieve the names of all tables in the database."""

@@ -1,4 +1,3 @@
-import os
 from langgraph.graph.message import add_messages
 from typing import Annotated, Literal
 from typing_extensions import TypedDict
@@ -7,19 +6,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages.ai import AIMessage
 from random import randint
 from langchain_core.messages.tool import ToolMessage
-from database_utils import process_bakery_order, create_connection
+from database_utils import process_bakery_order, add_customer
 from toolkit import order_tools, auto_tools, tool_node
 from bakery_beat import BakeryBeat
-from administrator import Administrator
 from designer import Designer
 from prompts import WAITERBOT_SYSINT
-
-GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
-
-# # Initialize the MenuDesigner
-# chronos_companion = BakeryBeat()
-# bakery_designer = Designer()
-# bakery_designer = Designer()
 
 
 class OrderState(TypedDict):
@@ -40,16 +31,8 @@ class OrderState(TypedDict):
 
 class Waiter:
     def __init__(self):
-        self.DATABASE_NAME = "/media/scar/HDD_Data/Repositories/daily-ai-journal/Gen_AI_Intensive_Course/Day-03/data/scar_bakery_ai.db"
-        self.conn = create_connection()  # Use your create_connection here if you prefer
-        self.cursor = self.conn.cursor()
-        self.chronos_companion = BakeryBeat(self.conn)  # Pass the connection here
+        self.chronos_companion = BakeryBeat()  # Pass the connection here
         self.bakery_designer = Designer()
-
-    def close_connection(self):
-        if self.conn:
-            self.conn.close()
-            print("Database connection closed.")
 
     def chatbot_with_tools(
         self, state: OrderState
@@ -58,8 +41,6 @@ class Waiter:
         defaults = {
             "order": [],
             "finished": False,
-            "is_admin_mode": False,
-            "admin_initiated": False,
         }
         if state["messages"]:
             llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
@@ -128,29 +109,6 @@ class Waiter:
                 order.clear()
                 response = None
 
-            elif tool_call["name"] == "place_order":
-                order_text = "\n".join(order)
-                print("Sending order to kitchen!")
-                print(order_text)
-
-                # Assuming you have customer_name and customer_email variables available here
-                customer_name = "Scar"  # Replace with the actual customer name
-                customer_email = (
-                    "scar@example.com"  # Replace with the actual customer email
-                )
-
-                order_placed = process_bakery_order(
-                    customer_name,
-                    customer_email,
-                    order,  # Pass self.conn here!
-                )
-                if order_placed:
-                    response = randint(1, 5)  # ETA in minutes
-                else:
-                    response = (
-                        "There was an issue processing your order. Please try again."
-                    )
-
             elif tool_call["name"] == "get_special_dish":
                 special_product = "Chocolate Croissant"  # Let's hardcode it for now
                 image_path = self.bakery_designer.generate_special_dish_image(
@@ -161,6 +119,38 @@ class Waiter:
                 response = (
                     response_message  # Assign the message to the response variable
                 )
+            elif tool_call["name"] == "get_customer_name":
+                state["customer_name"] = tool_call["args"]["name"]
+                response = f"Thanks, we've got your name: {state['customer_name']}"
+                self.customer_name = state.get("customer_name")
+
+            elif tool_call["name"] == "get_customer_email":  # Handle the new tool
+                customer_email = tool_call["args"].get("email")
+                state["customer_email"] = customer_email
+
+                print(state)
+
+                self.customer_email = customer_email
+
+                print(
+                    f"{self.customer_name} from email tool with {self.customer_email}"
+                )
+                add_customer(self.customer_name, self.customer_email)
+
+                response = f"Got your email: {state['customer_email']}"
+
+            elif tool_call["name"] == "place_order":
+                order_text = "\n".join(order)
+                print("Sending order to kitchen!")
+                print(order_text)
+
+                order_placed = process_bakery_order(order)
+                if order_placed:
+                    response = randint(1, 5)  # ETA in minutes
+                else:
+                    response = (
+                        "There was an issue processing your order. Please try again."
+                    )
 
             else:
                 raise NotImplementedError(f"Unknown tool call: {tool_call['name']}")
@@ -248,7 +238,16 @@ class Waiter:
                 "closed": "end_closed",
             },
         )
-
+        graph_builder.add_conditional_edges(
+            "human",
+            lambda state: "end_session"
+            if state.get("admin_initiated", False)
+            else "regular_flow",
+            {
+                "regular_flow": "route_after_human",
+                "end_session": END,
+            },
+        )
         graph_builder.add_conditional_edges(
             "route_after_human",
             lambda state: state.get("next"),
@@ -268,7 +267,7 @@ class Waiter:
         config = {"recursion_limit": 100}
 
         state = graph_with_order_tools.invoke({"messages": []}, config)
-        self.close_connection()  # Close the connection when the interaction finishes
+        # self.close_connection()  # Close the connection when the interaction finishes
 
 
 if __name__ == "__main__":

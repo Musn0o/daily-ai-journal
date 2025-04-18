@@ -1,4 +1,5 @@
 # designer.py
+import datetime
 import os
 from google import genai
 from google.genai import types
@@ -37,8 +38,9 @@ class Designer:
                 """
 
         response = self.client.models.generate_content(
-            model="gemini-2.0-flash-exp-image-generation",
-            contents=prompt,  # Use the dynamic prompt here
+            # Change the model name here:
+            model="gemini-2.0-flash-exp)",
+            contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0, top_p=0.5, response_modalities=["Text", "Image"]
             ),
@@ -64,10 +66,11 @@ class Designer:
         """
 
         response = self.client.models.generate_content(
-            model="gemini-2.0-flash-exp-image-generation",
-            contents=prompt,  # Use the dynamic prompt here
+            # Change the model name here:
+            model="gemini-2.0-flash-exp",
+            contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.0, top_p=0.8, response_modalities=["Text", "Image"]
+                temperature=0.0, top_p=0.5, response_modalities=["Text", "Image"]
             ),
         )
 
@@ -83,3 +86,23 @@ class Designer:
                 print(f"Text response: {part.text}")
 
         return image_file_path
+
+
+now = datetime.datetime.now()
+current_month = now.month
+occasion = "Halloween"
+designer = Designer()
+welcome_image = designer.generate_welcome_image(current_month, "Halloween")
+if welcome_image:
+    print(welcome_image)
+
+# Make sure your GOOGLE_API_KEY environment variable is set
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable not set.")
+
+client = genai.Client(api_key=GOOGLE_API_KEY)
+
+print("Listing available models supporting 'generateContent':")
+for model in client.models.list():
+    print(f"- {model.name})")

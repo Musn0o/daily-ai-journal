@@ -47,7 +47,10 @@ class Calendar:
                     None,
                     "Welcome to Scar's Bakery! Enjoy our delicious treats today.",
                 )
-        except:
+        except Exception as e:
+            print(
+                f"An error occurred while trying to get today's occasion: {e}"
+            )  # Or use logging
             return None, "Welcome to Scar's Bakery! Enjoy our delicious treats today."
 
 

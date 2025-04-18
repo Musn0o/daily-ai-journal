@@ -3,7 +3,6 @@ from google import genai
 import datetime
 import pytz
 from database_utils import create_connection
-from designer import Designer
 from calendar_helper import Calendar
 
 
@@ -11,7 +10,7 @@ class BakeryBeat:
     def __init__(self):
         GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
         self.client = genai.Client(api_key=GEMINI_API_KEY)
-        self.menu_designer = Designer()
+        # self.menu_designer = Designer()
         self.organizer = Calendar(GEMINI_API_KEY)
         self.now = datetime.datetime.now()
 
@@ -77,20 +76,37 @@ class BakeryBeat:
 
         return False  # Return False if connection fails
 
+    # def generate_welcome_message(self):
+    #     current_month = self.now.month
+
+    #     occasion_name, welcome_message = self.organizer.get_today_occasion()
+
+    #     image_path = self.menu_designer.generate_welcome_image(
+    #         month=current_month, occasion_name=occasion_name
+    #     )
+
+    #     if image_path:
+    #         WELCOME_MSG = f"{welcome_message}\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
+    #         return WELCOME_MSG
+    #     else:
+    #         WELCOME_MSG = (
+    #             f"{welcome_message} Type `Bye` to quit. How may I serve you today?"
+    #         )
+    #         return WELCOME_MSG
     def generate_welcome_message(self):
-        current_month = self.now.month
+        # current_month is no longer directly used here, but keeping self.now might be useful
+        # current_month = self.now.month # This line can be removed
 
-        occasion_name, welcome_message = self.organizer.get_today_occasion()
+        # Get occasion name and welcome message text from Calendar
+        occasion_name, welcome_message_text = self.organizer.get_today_occasion()
 
-        image_path = self.menu_designer.generate_welcome_image(
-            month=current_month, occasion_name=occasion_name
+        # Remove the call to Designer
+        # image = self.menu_designer.generate_welcome_image(
+        #     month=current_month, occasion_name=occasion_name
+        # )
+
+        # Remove the image handling and return only the formatted text message
+        WELCOME_MSG = (
+            f"{welcome_message_text}\n\nType `Bye` to quit. How may I serve you today?"
         )
-
-        if image_path:
-            WELCOME_MSG = f"{welcome_message}\n\n{image_path}\n\nType `Bye` to quit. How may I serve you today?"
-            return WELCOME_MSG
-        else:
-            WELCOME_MSG = (
-                f"{welcome_message} Type `Bye` to quit. How may I serve you today?"
-            )
-            return WELCOME_MSG
+        return WELCOME_MSG

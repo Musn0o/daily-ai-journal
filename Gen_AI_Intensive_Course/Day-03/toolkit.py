@@ -74,7 +74,7 @@ order_tools = [
     get_order,
     clear_order,
     place_order,
-    get_special_dish,
+    # get_special_dish,
     get_customer_name,
     get_customer_email,
 ]

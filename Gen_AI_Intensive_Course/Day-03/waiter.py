@@ -9,7 +9,6 @@ from langchain_core.messages.tool import ToolMessage
 from database_utils import process_bakery_order, add_customer
 from toolkit import order_tools, auto_tools, tool_node
 from bakery_beat import BakeryBeat
-from designer import Designer
 from prompts import WAITERBOT_SYSINT
 
 
@@ -32,7 +31,7 @@ class OrderState(TypedDict):
 class Waiter:
     def __init__(self):
         self.chronos_companion = BakeryBeat()  # Pass the connection here
-        self.bakery_designer = Designer()
+        self.llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
 
     def chatbot_with_tools(
         self, state: OrderState
@@ -43,9 +42,7 @@ class Waiter:
             "finished": False,
         }
         if state["messages"]:
-            llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
-
-            llm_with_tools = llm.bind_tools(auto_tools + order_tools)
+            llm_with_tools = self.llm.bind_tools(auto_tools + order_tools)
             new_output = llm_with_tools.invoke([WAITERBOT_SYSINT] + state["messages"])
         else:
             new_output = AIMessage(
@@ -109,16 +106,16 @@ class Waiter:
                 order.clear()
                 response = None
 
-            elif tool_call["name"] == "get_special_dish":
-                special_product = "Chocolate Croissant"  # Let's hardcode it for now
-                image_path = self.bakery_designer.generate_special_dish_image(
-                    special_product
-                )
-                response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
-                print(response_message)
-                response = (
-                    response_message  # Assign the message to the response variable
-                )
+            # elif tool_call["name"] == "get_special_dish":
+            #     special_product = "Chocolate Croissant"  # Let's hardcode it for now
+            #     image_path = self.bakery_designer.generate_special_dish_image(
+            #         special_product
+            #     )
+            #     response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
+            #     print(response_message)
+            #     response = (
+            #         response_message  # Assign the message to the response variable
+            #     )
             elif tool_call["name"] == "get_customer_name":
                 state["customer_name"] = tool_call["args"]["name"]
                 response = f"Thanks, we've got your name: {state['customer_name']}"

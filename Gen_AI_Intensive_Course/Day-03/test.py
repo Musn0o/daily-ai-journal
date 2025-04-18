@@ -11,7 +11,6 @@ from database_utils import process_bakery_order, create_connection
 from toolkit import order_tools, auto_tools, tool_node
 from bakery_beat import BakeryBeat
 from administrator import Administrator
-from designer import Designer
 from prompts import WAITERBOT_SYSINT
 
 GEMINI_API_KEY = os.environ.get("GOOGLE_API_KEY")
@@ -47,7 +46,7 @@ class Waiter:
         self.conn = create_connection()  # Use your create_connection here if you prefer
         self.cursor = self.conn.cursor()
         self.chronos_companion = BakeryBeat()  # Pass the connection here
-        self.bakery_designer = Designer()
+        # self.bakery_designer = Designer()
 
     def close_connection(self):
         if self.conn:
@@ -168,16 +167,16 @@ class Waiter:
                         "There was an issue processing your order. Please try again."
                     )
 
-            elif tool_call["name"] == "get_special_dish":
-                special_product = "Chocolate Croissant"  # Let's hardcode it for now
-                image_path = self.bakery_designer.generate_special_dish_image(
-                    special_product
-                )
-                response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
-                print(response_message)
-                response = (
-                    response_message  # Assign the message to the response variable
-                )
+            # elif tool_call["name"] == "get_special_dish":
+            #     special_product = "Chocolate Croissant"  # Let's hardcode it for now
+            #     image_path = self.bakery_designer.generate_special_dish_image(
+            #         special_product
+            #     )
+            #     response_message = f"Great choice! Here's a look at our special '{special_product}': {image_path}"
+            #     print(response_message)
+            #     response = (
+            #         response_message  # Assign the message to the response variable
+            #     )
 
             else:
                 raise NotImplementedError(f"Unknown tool call: {tool_call['name']}")

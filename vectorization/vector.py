@@ -14,8 +14,8 @@ list_a = list(range(100000))
 num_arr = np.array(list_a)
 list_sum = [n + 10 for n in list_a]
 vectorized = num_arr + 10
-# print(f"Output with added value of 10 to each element of the list {list_sum}")
-# print(f"Output with added value of 10 to each element of the array {vectorized}")
+print(f"Output with added value of 10 to each element of the list {list_sum}")
+print(f"Output with added value of 10 to each element of the array {vectorized}")
 
 
 """2.Element-wise Multiplication:
@@ -32,10 +32,10 @@ list_c = list(range(size))
 num_arr_a = np.array(list_b)
 num_arr_b = np.array(list_c)
 
-# multiplied_lists = [n * i for n in list_b for i in list_c]
+multiplied_lists = [n * i for n in list_b for i in list_c]
 multiplied = np.multiply(num_arr_a, num_arr_b)
-# print(f"Multiplied lists {multiplied_lists}")
-# print(f"Multiplied arrays {multiplied}")
+print(f"Multiplied lists {multiplied_lists}")
+print(f"Multiplied arrays {multiplied}")
 
 
 """3.Thresholding and Summation:
@@ -64,4 +64,4 @@ print(f"Sum of filtered array {np.sum(filtered_elements)}")
 math_arr = np.linspace(0, 2 * np.pi, 50000)
 print(math_arr)
 result = np.sin(math_arr)
-print(result)
+print(f"sine of each element in the array {result}")

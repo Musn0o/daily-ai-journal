@@ -24,7 +24,7 @@ print(f"This is 2D NumPy array with the values\n ˅\n{three_by_three_array}")
     or just like normal lists three_by_three_array[0][2] both will work
 """
 print(
-    f"This is the element in the second row and third column >> {three_by_three_array[0, 2]}"
+    f"This is the element in the second row and third column >> {three_by_three_array[1, 2]}"
 )
 
 """We can also create the 2D array directly without reshaping just like the below example

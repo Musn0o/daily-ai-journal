@@ -57,6 +57,6 @@ print(df_json)
     from Exercise 1 to read data directly from this file instead of the string?"""
 
 """The difference won't be big
-I would only use this line df_csv1 = pd.read_csv("Pandas_Exercises/my_data.csv")
+I would only use this line df_csv1 = pd.read_csv("Pandas_Exercises/data_loading/my_data.csv")
 assuming the file name is my_data.csv actually this looks much easier than using StringIO
  """

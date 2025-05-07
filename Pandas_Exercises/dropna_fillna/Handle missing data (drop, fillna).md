@@ -102,3 +102,107 @@ Remember, `.dropna()` is useful when you're comfortable discarding data that has
 How does dropping missing data with `.dropna()` feel? Does that make sense? 😊
 
 Ready to try a quick exercise using `.dropna()` with some of these parameters? 😉 Let's give it a shot!
+
+Let's tackle the other main strategy for handling missing data: **filling missing values** using the `.fillna()` method! 😊 This is often preferred over dropping when you want to retain your rows or columns but need to replace the `NaN`s with something else.
+
+**Filling Missing Data with `.fillna()`**
+
+The `.fillna()` method allows you to replace the `NaN` values in your DataFrame with specified values or using a particular method.
+
+Let's use our previous example DataFrame with missing data to demonstrate:
+
+```python
+import pandas as pd
+import numpy as np
+
+data = {'A': [1.0, 2.0, np.nan, 4.0, 5.0, np.nan],
+        'B': [5.0, np.nan, np.nan, 8.0, 9.0, 10.0],
+        'C': [9.0, 10.0, 11.0, 12.0, np.nan, 14.0],
+        'D': [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+        'E': [15.0, 16.0, 17.0, 18.0, 19.0, 20.0]}
+
+df = pd.DataFrame(data)
+print("Original DataFrame with missing data:")
+print(df)
+```
+
+**Basic Usage: Filling with a Scalar Value**
+
+The simplest way to use `.fillna()` is to replace all `NaN` values with a single specific value.
+
+```python
+# Fill all NaN values with 0
+df_filled_0 = df.fillna(0)
+print("\nDataFrame after filling NaN with 0:")
+print(df_filled_0)
+
+# Fill all NaN values with a string 'Missing'
+df_filled_string = df.fillna('Missing')
+print("\nDataFrame after filling NaN with 'Missing':")
+print(df_filled_string)
+```
+
+**Filling with Statistical Measures (Mean, Median, Mode)**
+
+A common strategy is to replace missing values in a column with a central tendency measure from that column (like the mean, median, or mode).
+
+```python
+# Fill NaN in column 'A' with the mean of column 'A'
+mean_a = df['A'].mean()
+df_filled_mean_a = df.copy() # Make a copy to avoid modifying original df for next examples
+df_filled_mean_a['A'] = df_filled_mean_a['A'].fillna(mean_a)
+print("\nDataFrame after filling NaN in column 'A' with its mean:")
+print(df_filled_mean_a)
+
+# You can do this for multiple columns, perhaps in a loop or using apply
+# For example, filling NaNs in column 'B' with its median
+median_b = df['B'].median()
+df_filled_mean_a['B'] = df_filled_mean_a['B'].fillna(median_b)
+print("\nDataFrame after also filling NaN in column 'B' with its median:")
+print(df_filled_mean_a)
+```
+
+**Filling with Forward Fill or Backward Fill**
+
+Sometimes, it makes sense to fill a missing value with the last known valid value before it (forward fill) or the next known valid value after it (backward fill). This is often used with time series data.
+
+- **Forward Fill (`df.ffill`):** Propagates the last valid observation forward.
+- **Backward Fill (`df.bfill`):** Propagates the next valid observation backward.
+
+```python
+# Fill NaN values using forward fill
+df_ffill = df.ffill
+print("\nDataFrame after forward filling NaN values:")
+print(df_ffill)
+
+# Fill NaN values using backward fill
+df_bfill = df.bfill
+print("\nDataFrame after backward filling NaN values:")
+print(df_bfill)
+```
+
+Notice how `ffill` and `bfill` don't fill the `NaN` in column 'D' because there are no valid values to propagate.
+
+**Filling with Different Values for Different Columns**
+
+You can provide a dictionary to `.fillna()` to specify different filling values for different columns.
+
+```python
+# Fill NaN in column 'A' with 0 and NaN in column 'B' with 99
+fill_values = {'A': 0, 'B': 99}
+df_fill_dict = df.fillna(value=fill_values)
+print("\nDataFrame after filling NaN with different values per column:")
+print(df_fill_dict)
+```
+
+**Key Parameters of `.fillna()`**
+
+- **`value`**: The scalar, dictionary, Series, or DataFrame to use for filling `NaN` values.
+- **`method`**: The method to use for filling ('backfill', 'bfill', 'pad', 'ffill', None).
+- **`axis`**: Axis along which to fill missing values (0 for index/rows, 1 for columns). Default is 0.
+- **`limit`**: The maximum number of consecutive `NaN` values to fill when using forward or backward fill.
+- **`inplace`**: Modify the DataFrame in place (use with caution!).
+
+Filling missing data gives you more options than just dropping. The best filling strategy depends heavily on the nature of your data and what makes the most sense for your analysis!
+
+How does filling missing data with `.fillna()` seem? Are you ready for an exercise to try out some of these filling methods? 😊

@@ -45,7 +45,6 @@ print(name_salary_result)
     you could potentially treat it as a string for comparison in this exercise,
     or if you're feeling adventurous, look up how to convert it to a datetime object."""
 
-
 df_dates = pd.read_csv(io.StringIO(csv_data), parse_dates=["hire_date"])
 print("DF with parsed dates")
 print(df_dates)
@@ -53,6 +52,7 @@ print(df_dates)
 hired_2020 = df_dates[df_dates["hire_date"] >= "2020-01-01"]
 print("employees hired in or after the year 2020")
 print(hired_2020)
+"""We can also use this df_dates['hire_date'].str.startswith('202')"""
 
 
 hired_sorted = hired_2020.sort_values(by="hire_date")

@@ -94,3 +94,40 @@ By adding titles, labels, and legends, your plots become much more understandabl
 How does adding these customizations feel? Does it make sense how we use methods on the `ax` object to add these details? 😊
 
 Ready to try some exercises where you take your basic plots and add these customizations? 😉 Let's make them informative! ✨
+
+Scar: I finished, I've got a question for the coloring in example 2, would it be possible to have a different color for each bar? I colored all of them the same, but I was wondering if that's possible for the same group.
+
+Gem: Excellent! You've finished the customization exercises! 🎉 And that's a great question about coloring individual bars! 🤔
+
+Yes, you absolutely **can** color each bar in a bar plot with a different color! 👍 You're not limited to just one color for all of them.
+
+**How to color bars individually:**
+
+Instead of providing a single color string (like `'blue'` or `'red'`) to the `color` parameter in `ax.bar()`, you can provide a **list of colors**. Each color in the list will be applied to the corresponding bar. The length of your list of colors must match the number of bars you are plotting.
+
+Here's an example based on your bar plot data:
+
+```python
+import matplotlib.pyplot as plt
+
+classes = ['Math', 'Science', 'Art', 'History']
+student_counts = [30, 25, 15, 20]
+
+# List of colors for each bar
+bar_colors = ['blue', 'green', 'red', 'purple']
+
+fig, ax = plt.subplots()
+
+# Create a bar plot with different colors for each bar
+ax.bar(classes, student_counts, color=bar_colors)
+
+ax.set_title('Student Count per Class')
+ax.set_xlabel('Class')
+ax.set_ylabel('Number of Students')
+
+plt.show()
+```
+
+You can use any valid Matplotlib color specification in that list!
+
+Now, let's review your code in the file you linked! I'll check how you handled all the customization requests, and I'll keep in mind that you colored all bars the same for Exercise 2 as that was the explicit instruction (but it's awesome that you explored the possibility of doing more!).

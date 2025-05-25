@@ -60,7 +60,7 @@ X_test_scaled = scaler.transform(X_test)
     Train the model using your scaled training features (X_train_scaled) and your training target (y_train)."""
 
 # first try linear kernel
-svm = SVC(kernel="linear", random_state=42)
+svm = SVC(kernel="linear", random_state=42, C=1, gamma="scale")
 svm.fit(X_train_scaled, y_train)
 # second try rbf kernel
 svm_2nd = SVC(kernel="rbf", random_state=42, C=10, gamma="scale")
@@ -104,3 +104,32 @@ plt.xlabel("Exam Score")
 plt.ylabel("Hours Studied")
 plt.title("Synthetic Data: Exam Score vs. Hours Studied")
 plt.show()
+
+
+# # Assume X_train_scaled, X_test_scaled, y_train, y_test are already defined as in your code
+
+# C_values = [0.01, 0.1, 1, 10, 100, 1000]
+# results = []
+
+# for C in C_values:
+#     svm = SVC(kernel="linear", C=C, random_state=42)
+#     svm.fit(X_train_scaled, y_train)
+#     y_pred = svm.predict(X_test_scaled)
+#     acc = accuracy_score(y_test, y_pred)
+#     results.append((C, acc))
+
+# print("C vs. accuracy (linear kernel):")
+# for C, acc in results:
+#     print(f"C={C}: accuracy={acc:.3f}")
+
+# best_C, best_acc = max(results, key=lambda x: x[1])
+# print(f"\nBest C: {best_C} with accuracy: {best_acc:.3f}")
+
+# # Optionally, print the classification report and confusion matrix for the best C
+# svm_best = SVC(kernel="linear", C=best_C, random_state=42)
+# svm_best.fit(X_train_scaled, y_train)
+# y_pred_best = svm_best.predict(X_test_scaled)
+# print("\nClassification report for best C (linear kernel):")
+# print(classification_report(y_test, y_pred_best))
+# print("Confusion matrix for best C (linear kernel):")
+# print(confusion_matrix(y_test, y_pred_best))

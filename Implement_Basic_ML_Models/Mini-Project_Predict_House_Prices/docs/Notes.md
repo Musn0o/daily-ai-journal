@@ -1,4 +1,4 @@
-# 🏡 Phase 1 & 2: EDA and Preprocessing Checklist & Interpretation Notes  
+# 🏡 Phase 1, 2 & 3: EDA, Preprocessing, Modeling Checklist & Interpretation Notes  
 *House Prices - Advanced Regression Techniques (Kaggle)*
 
 ---
@@ -210,6 +210,104 @@
 - Proceed to Phase 3: Model Selection, Training & Evaluation.
 - Consider cross-validation and hyperparameter tuning for robust results.
 - Document model performance and interpretation.
+
+---
+
+---
+
+## Phase 3: Model Selection, Hyperparameter Tuning, Evaluation & Ensembling
+
+### 1. Train/Validation Split
+
+- [x] **Split data into train and validation sets (80/20 split, random_state=42, shuffle=True)**
+- [x] **Ensured reproducibility and robust validation**
+
+---
+
+### 2. Model Definitions
+
+- [x] **Defined baseline and advanced models:**
+  - Linear Regression (baseline)
+  - Decision Tree Regressor
+  - Random Forest Regressor
+  - Gradient Boosting Regressor
+
+---
+
+### 3. Hyperparameter Tuning
+
+- [x] **RandomizedSearchCV used for hyperparameter tuning:**
+  - **Random Forest:** Tuned `n_estimators`, `max_depth`, `min_samples_split`, `min_samples_leaf`, `max_features`
+  - **Gradient Boosting:** Tuned `n_estimators`, `learning_rate`, `max_depth`, `subsample`, `min_samples_split`
+- [x] **Best estimators selected based on cross-validated RMSE**
+
+> **Note:**  
+> RandomizedSearchCV is used for efficiency. Cross-validation ensures robust selection.
+
+---
+
+### 4. Cross-Validation & Validation
+
+- [x] **5-fold cross-validation performed for all models (scoring: RMSE)**
+- [x] **Validation set used for final model evaluation**
+- [x] **Results (MSE, RMSE, R²) printed for each model**
+
+---
+
+### 5. Feature Importance
+
+- [x] **Feature importances extracted and displayed for:**
+  - Random Forest (best estimator)
+  - Gradient Boosting (best estimator)
+- [x] **Top features identified for interpretation**
+
+---
+
+### 6. Ensembling
+
+- [x] **VotingRegressor ensemble created using:**
+  - Linear Regression
+  - Tuned Random Forest
+  - Tuned Gradient Boosting
+- [x] **Ensemble fitted and evaluated on validation set (RMSE, R² reported)**
+
+---
+
+### 7. Results Summary
+
+- [x] **Results for all models summarized in a DataFrame**
+- [x] **Best model selected based on lowest validation RMSE**
+- [x] **Summary table printed for easy comparison**
+
+---
+
+### 8. Final Model Training & Submission
+
+- [x] **Best model retrained on full training data**
+- [x] **Predictions made on test set**
+- [x] **If target was log-transformed, predictions are inverse-transformed**
+- [x] **Submission file created and saved**
+- [x] **Final model saved with timestamp for reproducibility**
+
+---
+
+#### 🟢 **Key Takeaways from Modeling & Evaluation**
+
+- **Multiple models compared using cross-validation and validation RMSE.**
+- **Hyperparameter tuning significantly improved advanced models.**
+- **Feature importance analysis aids interpretability.**
+- **Ensembling further boosted performance.**
+- **Best model is automatically selected and used for final predictions and submission.**
+- **All steps are reproducible and results are well-documented.**
+
+---
+
+## 📌 **Next Steps**
+
+- Consider further feature engineering or advanced ensembling for marginal gains.
+- Analyze feature importances for domain insights.
+- Review model performance summary to guide future improvements.
+- Proceed to submission and/or further model interpretation.
 
 ---
 

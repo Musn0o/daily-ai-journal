@@ -15,3 +15,14 @@ This journal is structured to reflect various domains of my AI exploration:
 -   **Python 🐍:** General Python scripts and explorations.
 -   **exploring_llms 💡:** My journey into understanding and working with Large Language Models.
 -   **Gen_AI_Intensive_Course 🎓:** Notes and materials from an intensive Generative AI course.
+
+## ✍️ Daily Log Format
+
+I aim to update this journal daily to track my continuous learning:
+
+-   📅 **Date:** YYYY-MM-DD
+-   📌 **What I learned today:**
+-   🔥 **Challenges I faced:**
+-   🚀 **Next steps:**
+
+Stay consistent & keep building! 💪🔥 Your AI journey starts here.
